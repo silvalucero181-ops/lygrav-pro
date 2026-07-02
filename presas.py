@@ -38,7 +38,6 @@ h1, h2, h3 {{
     color: {NAVY} !important;
 }}
 
-/* Forzar tema claro en toda la app, sin importar el tema del sistema/navegador */
 .stApp {{
     background-color: {CREAM} !important;
 }}
@@ -52,9 +51,6 @@ h1, h2, h3 {{
     background-color: {CREAM} !important;
 }}
 
-/* Encabezados de los expanders del sidebar (Talud, Hidráulica, Materiales):
-   Streamlit les da un fondo propio (clarito) por defecto; sin fijarlo
-   explícitamente, el texto crema queda invisible sobre ese fondo. */
 section[data-testid="stSidebar"] [data-testid="stExpander"] {{
     background-color: {NAVY_2} !important;
     border: 1px solid rgba(227,178,60,0.35) !important;
@@ -73,7 +69,6 @@ section[data-testid="stSidebar"] [data-testid="stExpander"] [data-testid="stExpa
     background-color: {NAVY} !important;
 }}
 
-/* Sidebar */
 section[data-testid="stSidebar"] {{
     background-color: {NAVY};
 }}
@@ -84,8 +79,6 @@ section[data-testid="stSidebar"] hr {{
     border-color: {NAVY_2};
 }}
 
-/* Campos de entrada (number_input, slider, selectbox, data_editor) SIEMPRE
-   fondo blanco y texto navy, sin importar el tema claro/oscuro del sistema */
 section[data-testid="stSidebar"] input,
 section[data-testid="stSidebar"] textarea,
 section[data-testid="stSidebar"] [data-baseweb="select"] *,
@@ -101,24 +94,16 @@ section[data-testid="stSidebar"] [data-baseweb="select"] > div {{
     background-color: #FFFFFF !important;
     border-radius: 6px;
 }}
-/* Iconos +/- de los number_input y flechas de selects */
 section[data-testid="stSidebar"] button svg,
 section[data-testid="stSidebar"] [data-baseweb="select"] svg {{
     fill: {NAVY} !important;
     color: {NAVY} !important;
 }}
-/* Texto de las pestañas de la tabla de coordenadas (data_editor) */
 .stApp [data-testid="stDataFrame"] *,
 .stApp [data-testid="stDataEditor"] * {{
     color: {NAVY} !important;
 }}
 
-/* ===================================================================
-   TABLAS / DATAFRAMES EN EL ÁREA PRINCIPAL Y EN EL SIDEBAR
-   Streamlit renderiza st.dataframe / st.data_editor con un tema propio
-   (a veces oscuro según el tema del navegador). Forzamos aquí un fondo
-   claro que combine con la paleta CREAM/NAVY/GOLD/TEAL del programa.
-   =================================================================== */
 [data-testid="stDataFrame"],
 [data-testid="stDataEditor"] {{
     background-color: #FFFFFF !important;
@@ -130,20 +115,17 @@ section[data-testid="stSidebar"] [data-baseweb="select"] svg {{
 [data-testid="stDataEditor"] div {{
     background-color: #FFFFFF !important;
 }}
-/* Encabezados de columna con acento de la paleta */
 [data-testid="stDataFrame"] [role="columnheader"],
 [data-testid="stDataEditor"] [role="columnheader"] {{
     background-color: {CREAM} !important;
     color: {NAVY} !important;
     font-weight: 600 !important;
 }}
-/* Celdas */
 [data-testid="stDataFrame"] [role="gridcell"],
 [data-testid="stDataEditor"] [role="gridcell"] {{
     background-color: #FFFFFF !important;
     color: {NAVY} !important;
 }}
-/* Fila resaltada al pasar el mouse */
 [data-testid="stDataFrame"] [role="row"]:hover [role="gridcell"],
 [data-testid="stDataEditor"] [role="row"]:hover [role="gridcell"] {{
     background-color: {CREAM} !important;
@@ -153,7 +135,6 @@ section[data-testid="stSidebar"] [data-testid="stDataEditor"] {{
     background-color: #FFFFFF !important;
 }}
 
-/* Tabs */
 .stTabs [data-baseweb="tab-list"] {{
     gap: 4px;
     border-bottom: 2px solid {CREAM};
@@ -170,7 +151,6 @@ section[data-testid="stSidebar"] [data-testid="stDataEditor"] {{
     color: {GOLD} !important;
 }}
 
-/* Metric-like result cards */
 .lg-card {{
     background-color: #FFFFFF;
     border: 1px solid #E4E1D6;
@@ -197,7 +177,6 @@ section[data-testid="stSidebar"] [data-testid="stDataEditor"] {{
 .lg-bad {{ border-left-color: #D85A30 !important; }}
 .lg-bad .lg-val {{ color: #993C1D; }}
 
-/* Section banner */
 .lg-banner {{
     background: linear-gradient(90deg, {NAVY} 0%, {NAVY_2} 100%);
     color: {CREAM};
@@ -330,6 +309,11 @@ if not st.session_state.entrar:
 #   • Tabla y visualización muestran brazos medidos desde la PUNTA.
 #   • Área y centroide calculados con FÓRMULA DE SHOELACE → exacta para
 #     cualquier polígono simple, independientemente de su forma.
+#   • EMPUJE HIDROSTÁTICO SOBRE CARA INCLINADA: se descompone en
+#     componente horizontal (F, la de siempre, con el prisma de presión)
+#     y componente VERTICAL (Fv = peso del agua apoyada sobre el talud,
+#     entre la cara y la vertical trazada desde el pie de esa cara). Si
+#     la cara es vertical, Fv=0 automáticamente.
 # =========================================================================
 
 def _shoelace(px, py):
@@ -346,6 +330,21 @@ def _shoelace(px, py):
     return area, x_cg
 
 
+def _obtener_cadenas(px, py):
+    """
+    Divide el contorno de la presa en la cadena aguas arriba (talón→cresta)
+    y aguas abajo (cresta→punta), asumiendo un único vértice de cresta (el
+    de mayor Y). Es la misma lógica que usan la vista "Perfil Geométrico"
+    y la descomposición en rectángulos/triángulos.
+    """
+    idx_cresta = py.index(max(py))
+    chain_izq_x = px[:idx_cresta + 1]
+    chain_izq_y = py[:idx_cresta + 1]
+    chain_der_x = px[idx_cresta:]
+    chain_der_y = py[idx_cresta:]
+    return chain_izq_x, chain_izq_y, chain_der_x, chain_der_y, px[idx_cresta]
+
+
 def _decomponer_rectangulos_triangulos(px, py, gamma_c, L):
     """
     Descompone el perfil de la presa en franjas verticales (rectángulo +
@@ -353,21 +352,9 @@ def _decomponer_rectangulos_triangulos(px, py, gamma_c, L):
     lógica que se enseña a mano: se identifican los tramos verticales
     (rectángulos) y las transiciones de talud (triángulos), en vez de
     una triangulación en abanico sin significado físico.
-
-    Se asume que el polígono tiene un único vértice de cresta (el de
-    mayor Y) y que, a ambos lados de la cresta, la coordenada X no
-    decrece (caras de la presa sin contrapendientes) — igual que exige
-    la vista "Perfil Geométrico".
     """
-    n = len(px)
     y_base = min(py)
-    idx_cresta = py.index(max(py))
-    x_cresta = px[idx_cresta]
-
-    chain_izq_x = px[:idx_cresta + 1]
-    chain_izq_y = py[:idx_cresta + 1]
-    chain_der_x = px[idx_cresta:]
-    chain_der_y = py[idx_cresta:]
+    chain_izq_x, chain_izq_y, chain_der_x, chain_der_y, x_cresta = _obtener_cadenas(px, py)
 
     if len(chain_izq_x) > 1:
         orden = np.argsort(chain_izq_x)
@@ -424,10 +411,53 @@ def _decomponer_rectangulos_triangulos(px, py, gamma_c, L):
     return filas
 
 
+def _cuna_agua(chain_x, chain_y, x_ref, h, gamma_w, L):
+    """
+    Peso del agua que se apoya sobre una cara inclinada de la presa, en la
+    región comprendida entre la cara y la vertical x=x_ref (la vertical
+    trazada desde el pie de esa cara), hasta la altura h.
+
+    Es exactamente la componente VERTICAL del empuje hidrostático sobre
+    un talud: si la cara es vertical (x constante), la cuña tiene ancho
+    cero y Fv=0 automáticamente — coherente con la teoría clásica, donde
+    una cara vertical solo genera empuje horizontal.
+
+    Devuelve (Fv, x_centroide_global_de_la_cuña).
+    """
+    if h <= 1e-9 or len(chain_x) < 2:
+        return 0.0, x_ref
+
+    orden = np.argsort(chain_y)
+    xs = np.array(chain_x)[orden]
+    ys = np.array(chain_y)[orden]
+
+    if h > ys.max() + 1e-9:
+        h = float(ys.max())
+
+    x_en_h = float(np.interp(h, ys, xs))
+    pts_x, pts_y = [], []
+    for x, y in zip(xs, ys):
+        if y <= h + 1e-9:
+            pts_x.append(float(x)); pts_y.append(float(y))
+        else:
+            break
+    if not pts_y or pts_y[-1] < h - 1e-9:
+        pts_x.append(x_en_h); pts_y.append(h)
+
+    if len(pts_x) < 2:
+        return 0.0, x_ref
+
+    poly_x = pts_x + [x_ref, x_ref]
+    poly_y = pts_y + [h, 0.0]
+    area, cx = _shoelace(poly_x, poly_y)
+    if area < 1e-9:
+        return 0.0, x_ref
+    return area * L * gamma_w, cx
+
+
 def calcular_presa_vacia(puntos_x, puntos_y, gamma_c=2300.0, L=1.0):
     px = list(puntos_x)
     py = list(puntos_y)
-    # Eliminar punto de cierre duplicado si existe
     if len(px) > 2 and abs(px[-1] - px[0]) < 1e-9 and abs(py[-1] - py[0]) < 1e-9:
         px.pop(); py.pop()
 
@@ -435,36 +465,21 @@ def calcular_presa_vacia(puntos_x, puntos_y, gamma_c=2300.0, L=1.0):
     x_min, x_max = min(px), max(px)
     b_base = x_max - x_min
 
-    # ── Área y centroide exactos (Shoelace) ───────────────────────────────
     A_total, x_cg_global = _shoelace(px, py)
     W_T = A_total * L * gamma_c
 
-    # Centroide relativo al talón (x_min) y a la punta (x_max)
     x_cg_talon = x_cg_global - x_min
     x_cg_punta = x_max   - x_cg_global
 
-    # ── CONVENCIÓN: brazos, excentricidad y momento SIEMPRE referenciados
-    # a la PUNTA (pie de la presa, "el peor de los casos" para el volteo):
-    #     e = x̄_punta − b/2
     e    = x_cg_punta - (b_base / 2.0)
     M_e  = W_T * e
 
     A_base  = b_base * L
     I_base  = L * (b_base ** 3) / 12.0
 
-    # Esfuerzos: TALÓN = "+", PUNTA = "−" (consistente con e referenciado
-    # a la punta: si el centroide se acerca a la punta, e>0 y el talón
-    # gana compresión adicional).
     sigma_talon = (W_T / A_base) + (M_e * (b_base / 2.0) / I_base)
     sigma_punta = (W_T / A_base) - (M_e * (b_base / 2.0) / I_base)
 
-    # ── Tabla: descomposición física en rectángulos y triángulos.
-    # Solo se muestran las columnas Figura / Área / Peso (numeradas de
-    # forma simple, sin indicar si es rectángulo o triángulo). Los brazos
-    # y momentos de cada pieza NO se muestran en la tabla porque generaban
-    # confusión con el Momento Me = W_T · e (que es el que corresponde a
-    # la excentricidad respecto al centro de la base, no la suma de
-    # momentos de cada figura respecto a la punta).
     piezas = _decomponer_rectangulos_triangulos(px, py, gamma_c, L)
     filas_tabla = []
     for i, p in enumerate(piezas, start=1):
@@ -480,11 +495,13 @@ def calcular_presa_vacia(puntos_x, puntos_y, gamma_c=2300.0, L=1.0):
         "Peso (kgf)": round(W_T, 2),
     })
 
+    chain_izq_x, chain_izq_y, chain_der_x, chain_der_y, x_cresta = _obtener_cadenas(px, py)
+
     return {
         "df":          pd.DataFrame(filas_tabla),
         "W_T":         W_T,
-        "x_cg_punta":  x_cg_punta,   # distancia centroide–punta (para tabla y presa llena)
-        "x_cg_talon":  x_cg_talon,   # distancia centroide–talón (interno)
+        "x_cg_punta":  x_cg_punta,
+        "x_cg_talon":  x_cg_talon,
         "e":           e,
         "M_e":         M_e,
         "sigma_talon": sigma_talon,
@@ -494,6 +511,8 @@ def calcular_presa_vacia(puntos_x, puntos_y, gamma_c=2300.0, L=1.0):
         "x_max":       x_max,
         "A_base":      A_base,
         "I_base":      I_base,
+        "chain_izq_x": chain_izq_x, "chain_izq_y": chain_izq_y,
+        "chain_der_x": chain_der_x, "chain_der_y": chain_der_y,
     }
 
 
@@ -501,11 +520,12 @@ def calcular_presa_llena(res_v, h_up, h_down, gamma_w=1000.0, mu=0.75, L=1.0):
     W_T        = res_v["W_T"]
     x_cg_punta = res_v["x_cg_punta"]
     b_base     = res_v["b_base"]
+    x_min      = res_v["x_min"]
+    x_max      = res_v["x_max"]
 
-    # Momento estabilizador del peso respecto a la PUNTA
     M_R = W_T * x_cg_punta
 
-    # 1. Empuje hidrostático aguas arriba (escalado por L, igual que W_T)
+    # 1. Empuje hidrostático aguas arriba — componente HORIZONTAL
     F_up, M_v_up, h_cp_up = 0.0, 0.0, 0.0
     if h_up > 0:
         h_cg_up  = h_up / 2.0
@@ -513,9 +533,14 @@ def calcular_presa_llena(res_v, h_up, h_down, gamma_w=1000.0, mu=0.75, L=1.0):
         I_cg_up  = (h_up ** 3) / 12.0
         h_cp_up  = (I_cg_up / (h_cg_up * h_up)) + h_cg_up
         F_up     = gamma_w * h_cg_up * A_up
-        M_v_up   = F_up * (h_up - h_cp_up)   # momento de volteo respecto a la punta (solo para Fsv)
+        M_v_up   = F_up * (h_up - h_cp_up)
 
-    # 2. Empuje hidrostático aguas abajo (resistente, escalado por L)
+    # 1b. Empuje hidrostático aguas arriba — componente VERTICAL
+    Fv_up, cx_Fv_up = _cuna_agua(res_v["chain_izq_x"], res_v["chain_izq_y"],
+                                  x_ref=x_min, h=h_up, gamma_w=gamma_w, L=L)
+    M_Fv_up = Fv_up * (x_max - cx_Fv_up)
+
+    # 2. Empuje hidrostático aguas abajo — componente HORIZONTAL
     F_down, M_e_down, h_cp_down = 0.0, 0.0, 0.0
     if h_down > 0:
         h_cg_down  = h_down / 2.0
@@ -523,64 +548,55 @@ def calcular_presa_llena(res_v, h_up, h_down, gamma_w=1000.0, mu=0.75, L=1.0):
         I_cg_down  = (h_down ** 3) / 12.0
         h_cp_down  = (I_cg_down / (h_cg_down * h_down)) + h_cg_down
         F_down     = gamma_w * h_cg_down * A_down
-        M_e_down   = F_down * (h_down - h_cp_down)   # momento estabilizador (solo para Fsv)
+        M_e_down   = F_down * (h_down - h_cp_down)
 
-    # 3. Subpresión trapezoidal (presión máx en talón p_up, mín en punta p_down)
-    #    escalada por L para ser consistente con W_T, F_up y F_down.
+    # 2b. Empuje hidrostático aguas abajo — componente VERTICAL
+    Fv_down, cx_Fv_down = _cuna_agua(res_v["chain_der_x"], res_v["chain_der_y"],
+                                      x_ref=x_max, h=h_down, gamma_w=gamma_w, L=L)
+    M_Fv_down = Fv_down * (x_max - cx_Fv_down)
+
+    # 3. Subpresión trapezoidal
     p_up, p_down = gamma_w * h_up, gamma_w * h_down
     U_rect  = min(p_up, p_down) * b_base * L
     U_tri   = (abs(p_up - p_down) * b_base * L) / 2.0
     U_total = U_rect + U_tri
 
-    # Brazo de la subpresión respecto a la PUNTA.
-    # El triángulo de presiones tiene su vértice CERO en el lado de menor
-    # presión y su base (máximo) en el lado de mayor presión. El centroide
-    # de un triángulo, medido desde su vértice de valor CERO, está a 2/3
-    # de la base — no a 1/3 (ese es el brazo medido desde el extremo
-    # opuesto, el de máxima presión).
     if U_total > 0:
         br_rect = b_base / 2.0
         if p_up >= p_down:
-            # Máximo en el TALÓN, cero en la PUNTA → el brazo medido desde
-            # la punta (el vértice cero) es 2/3 de la base.
             br_tri = (2.0 / 3.0) * b_base
         else:
-            # Máximo en la PUNTA, cero en el TALÓN → el brazo medido desde
-            # la punta (ahora el vértice máximo) es 1/3 de la base.
             br_tri = b_base / 3.0
         x_u     = (U_rect * br_rect + U_tri * br_tri) / U_total
-        M_v_sub = U_total * x_u   # momento de volteo respecto a la PUNTA → positivo
+        M_v_sub = U_total * x_u
     else:
         x_u, M_v_sub = 0.0, 0.0
 
-    Sum_M_Volteo          = M_v_up  + M_v_sub
-    Sum_M_Estabilizadores = M_R     + M_e_down
-    R_v = W_T - U_total
+    Sum_M_Volteo          = M_v_up + M_v_sub
+    Sum_M_Estabilizadores = M_R + M_e_down + M_Fv_up + M_Fv_down
 
-    # Factor de seguridad al volteo: balance COMPLETO de momentos (todas
-    # las fuerzas: peso, empujes horizontales y subpresión) respecto a la punta.
+    # Resultante vertical: ahora incluye Fv_up y Fv_down
+    R_v = W_T + Fv_up + Fv_down - U_total
+
     Fsv    = Sum_M_Estabilizadores / Sum_M_Volteo if Sum_M_Volteo > 0 else float('inf')
     F_H_n  = F_up - F_down
     Fsd    = (mu * R_v) / F_H_n if F_H_n > 0 else float('inf')
 
-    # x'' = posición de la resultante VERTICAL (peso - subpresión) medida
-    # desde la PUNTA. A diferencia de Fsv (que sí incluye los empujes
-    # horizontales), la ubicación de la resultante para el cálculo de
-    # esfuerzos en la base usa solo las fuerzas verticales W_T y U -
-    # el mismo criterio del método manual clásico (Fv*x'' = Wt*x_bar - Fs*brazo).
-    x_segundo = (M_R - M_v_sub) / R_v if R_v != 0 else 0.0
+    # x'' usa solo fuerzas VERTICALES (peso + Fv_up + Fv_down - subpresión)
+    x_segundo = (M_R + M_Fv_up + M_Fv_down - M_v_sub) / R_v if R_v != 0 else 0.0
 
-    # Excentricidad referenciada a la PUNTA (misma convención que presa vacía)
     e_llena   = x_segundo - (b_base / 2.0)
     M_e_llena = R_v * e_llena
 
     I_base = b_base ** 3 / 12.0
-    # TALÓN = "+", PUNTA = "-" (misma convención que presa vacía)
     sigma_talon_l = (R_v / b_base) + (M_e_llena * (b_base / 2.0) / I_base)
     sigma_punta_l = (R_v / b_base) - (M_e_llena * (b_base / 2.0) / I_base)
 
     return {
         "F_up": F_up, "F_down": F_down, "h_cp_up": h_cp_up, "h_cp_down": h_cp_down,
+        "Fv_up": Fv_up, "Fv_down": Fv_down,
+        "cx_Fv_up": cx_Fv_up, "cx_Fv_down": cx_Fv_down,
+        "M_Fv_up": M_Fv_up, "M_Fv_down": M_Fv_down,
         "U": U_total, "x_u": x_u,
         "M_R": M_R, "M_v_up": M_v_up, "M_e_down": M_e_down, "M_v_sub": M_v_sub,
         "Sum_M_Volteo": Sum_M_Volteo, "Sum_M_Estabilizadores": Sum_M_Estabilizadores,
@@ -590,24 +606,13 @@ def calcular_presa_llena(res_v, h_up, h_down, gamma_w=1000.0, mu=0.75, L=1.0):
     }
 
 
-
 # =========================================================================
 # DIAGRAMA DE ESFUERZOS (TALÓN - PUNTA) — ESTILO CLÁSICO "PEINE DE FLECHAS"
-# Silueta real de la presa, con un peine de flechas UNIFORMEMENTE
-# ESPACIADAS a lo largo de toda la base, cuya longitud es DIRECTAMENTE
-# PROPORCIONAL al esfuerzo real en cada punto (sin mínimos artificiales):
-#   • COMPRESIÓN (+) → flecha hacia ABAJO (apoyada bajo la base).
-#   • TRACCIÓN  (−) → flecha hacia ARRIBA, dibujada POR ENCIMA de la
-#     silueta de la presa (nunca escondida detrás del relleno gris).
-# Como el esfuerzo varía linealmente entre el talón y la punta, las puntas
-# de las flechas caen exactamente sobre una única línea recta diagonal
-# (la hipotenusa del diagrama clásico), que se dibuja directamente entre
-# los dos extremos — igual que en los diagramas de referencia.
 # =========================================================================
 def dibujar_diagrama_esfuerzos(sigma_talon, sigma_punta, b_base, titulo,
                                 puntos_x, puntos_y):
-    color_comp = "#1D9E75"   # compresión -> verde
-    color_trac = "#D85A30"   # tracción -> rojo/coral
+    color_comp = "#1D9E75"
+    color_trac = "#D85A30"
     color_talon = color_comp if sigma_talon >= 0 else color_trac
     color_punta = color_comp if sigma_punta >= 0 else color_trac
 
@@ -620,10 +625,6 @@ def dibujar_diagrama_esfuerzos(sigma_talon, sigma_punta, b_base, titulo,
 
     fig, ax = plt.subplots(figsize=(7.5, 6.5))
 
-    # Silueta de la presa (tono claro que combina con la paleta).
-    # zorder bajo (3/4) para que las flechas de esfuerzo (zorder 6/7) SIEMPRE
-    # se dibujen por delante, incluso cuando la flecha de tracción hacia
-    # arriba cae sobre el propio cuerpo de la presa (caso talud tendido).
     ax.fill(px, py, color="#E4E1D6", alpha=1.0, zorder=3)
     ax.plot(px + [px[0]], py + [py[0]], color=NAVY, linewidth=2.2, zorder=4)
 
@@ -637,9 +638,6 @@ def dibujar_diagrama_esfuerzos(sigma_talon, sigma_punta, b_base, titulo,
     y_tip_talon = y_base + sign_t * long_talon
     y_tip_punta = y_base + sign_p * long_punta
 
-    # ── Peine de flechas: espaciado UNIFORME en X a lo largo de toda la
-    # base (igual que en el diagrama clásico dibujado a mano). El número
-    # de flechas se adapta levemente al ancho de la base.
     n_flechas = int(np.clip(round(b_base / 1.0), 12, 26))
     fracs = np.linspace(0.0, 1.0, n_flechas)
     xs = x_min_p + fracs * (x_max_p - x_min_p)
@@ -651,33 +649,23 @@ def dibujar_diagrama_esfuerzos(sigma_talon, sigma_punta, b_base, titulo,
         signo       = -1 if sigma_local >= 0 else +1
 
         if longitud < alt_max * 0.02:
-            # Prácticamente sobre el cruce por cero: solo un punto de apoyo
             ax.plot(x, y_base, marker='o', markersize=3, color=NAVY_2, zorder=7)
             continue
 
         y_tip = y_base + signo * longitud
-        # zorder=6 (por encima del relleno de la presa, zorder=3/4) para que
-        # las flechas de tracción hacia arriba NUNCA queden ocultas detrás
-        # del cuerpo de la presa.
         ax.annotate("", xy=(x, y_tip), xytext=(x, y_base),
                     arrowprops=dict(arrowstyle="-|>", color=color, lw=1.6, mutation_scale=10), zorder=6)
 
-    # Línea diagonal única uniendo la punta de la flecha del talón con la
-    # de la punta (es recta porque el esfuerzo varía linealmente en X).
-    # También va por delante de la silueta de la presa.
     ax.plot([x_min_p, x_max_p], [y_tip_talon, y_tip_punta],
             color=MUTED, linewidth=1.4, zorder=6)
 
-    # Marca del cruce por cero, si el signo cambia entre talón y punta
     if (sigma_talon >= 0) != (sigma_punta >= 0) and (sigma_punta - sigma_talon) != 0:
         frac_zero = min(max(-sigma_talon / (sigma_punta - sigma_talon), 0.0), 1.0)
         x_zero = x_min_p + frac_zero * (x_max_p - x_min_p)
         ax.plot(x_zero, y_base, marker='o', markersize=4, color=NAVY_2, zorder=7)
 
-    # Línea de base (por delante de la silueta también)
     ax.plot([x_min_p, x_max_p], [y_base, y_base], color=NAVY, linewidth=1.6, zorder=6)
 
-    # Etiquetas adaptadas a la dirección de cada esfuerzo
     va_t = "top" if sigma_talon >= 0 else "bottom"
     va_p = "top" if sigma_punta >= 0 else "bottom"
     off  = alt_max * 0.12
@@ -693,7 +681,6 @@ def dibujar_diagrama_esfuerzos(sigma_talon, sigma_punta, b_base, titulo,
 
     ax.set_title(titulo, fontsize=15, fontweight="bold", color=NAVY, pad=14)
     ax.set_xlim(x_min_p - (x_max_p - x_min_p) * 0.30, x_max_p + (x_max_p - x_min_p) * 0.30)
-    # ylim cubre flechas hacia abajo Y hacia arriba
     y_lo = min(y_tip_talon, y_tip_punta, y_base) - alt_max * 0.25
     y_hi = max(y_tip_talon, y_tip_punta, max(py), y_base + alt_max * 0.1) + 2
     ax.set_ylim(y_lo, y_hi)
@@ -703,7 +690,9 @@ def dibujar_diagrama_esfuerzos(sigma_talon, sigma_punta, b_base, titulo,
     return fig
 
 
-def dibujar_diagrama_fuerzas(puntos_x, puntos_y, h_up, h_down, x_centroide_abs, W_T, F_up, F_down, U_total):
+def dibujar_diagrama_fuerzas(puntos_x, puntos_y, h_up, h_down, x_centroide_abs,
+                              W_T, F_up, F_down, U_total,
+                              Fv_up=0.0, Fv_down=0.0, cx_Fv_up=None, cx_Fv_down=None):
     px = list(puntos_x)
     py = list(puntos_y)
     if len(px) > 2 and px[-1] == px[0] and py[-1] == py[0]:
@@ -716,7 +705,6 @@ def dibujar_diagrama_fuerzas(puntos_x, puntos_y, h_up, h_down, x_centroide_abs, 
     ax.fill(px, py, color="#8C8C82", alpha=1.0, zorder=3)
     ax.plot(px + [px[0]], py + [py[0]], color="#1f1f1f", linewidth=2.2, zorder=4)
 
-    # F_H aguas arriba (solo si hay agua aguas arriba)
     if h_up > 0:
         y_arrow = h_up / 2.0
         ax.annotate("", xy=(x_min + ancho * 0.05, y_arrow), xytext=(x_min - ancho * 0.12, y_arrow),
@@ -724,7 +712,6 @@ def dibujar_diagrama_fuerzas(puntos_x, puntos_y, h_up, h_down, x_centroide_abs, 
         ax.text(x_min - ancho * 0.13, y_arrow + y_max * 0.04, f"F_H↑ = {F_up:,.0f} kgf",
                 color="#0F6E56", fontsize=10.5, fontweight="bold", ha="left", va="bottom")
 
-    # F_H aguas abajo (solo si hay agua aguas abajo)
     if h_down > 0:
         y_arrow2 = h_down / 2.0
         ax.annotate("", xy=(x_max - ancho * 0.05, y_arrow2), xytext=(x_max + ancho * 0.12, y_arrow2),
@@ -732,7 +719,24 @@ def dibujar_diagrama_fuerzas(puntos_x, puntos_y, h_up, h_down, x_centroide_abs, 
         ax.text(x_max + ancho * 0.13, y_arrow2 + y_max * 0.04, f"F_H↓ = {F_down:,.0f} kgf",
                 color="#0F6E56", fontsize=10.5, fontweight="bold", ha="right", va="bottom")
 
-    # Subpresión Fs (solo si hay agua en algún lado)
+    # Fv_up: componente VERTICAL del empuje aguas arriba (solo si la cara
+    # está inclinada y Fv_up>0) — flecha hacia ABAJO, apoyada en el punto
+    # de la cresta/talud donde actúa la cuña de agua.
+    if Fv_up > 1e-6 and cx_Fv_up is not None:
+        y_top_fv = float(np.interp(cx_Fv_up, px, py)) if len(px) >= 2 else y_max
+        ax.annotate("", xy=(cx_Fv_up, y_top_fv + y_max * 0.02), xytext=(cx_Fv_up, y_top_fv + y_max * 0.22),
+                     arrowprops=dict(arrowstyle="-|>", color="#7A4FB5", lw=2.6), zorder=6)
+        ax.text(cx_Fv_up, y_top_fv + y_max * 0.25, f"Fv↑ = {Fv_up:,.0f} kgf",
+                color="#5A3A8A", fontsize=10.5, fontweight="bold", ha="center", va="bottom", zorder=6)
+
+    # Fv_down: componente VERTICAL del empuje aguas abajo
+    if Fv_down > 1e-6 and cx_Fv_down is not None:
+        y_top_fv2 = float(np.interp(cx_Fv_down, px, py)) if len(px) >= 2 else y_max
+        ax.annotate("", xy=(cx_Fv_down, y_top_fv2 + y_max * 0.02), xytext=(cx_Fv_down, y_top_fv2 + y_max * 0.22),
+                     arrowprops=dict(arrowstyle="-|>", color="#7A4FB5", lw=2.6), zorder=6)
+        ax.text(cx_Fv_down, y_top_fv2 + y_max * 0.25, f"Fv↓ = {Fv_down:,.0f} kgf",
+                color="#5A3A8A", fontsize=10.5, fontweight="bold", ha="center", va="bottom", zorder=6)
+
     y_base = min(py)
     if h_up > 0 or h_down > 0:
         ax.annotate("", xy=(x_centroide_abs, y_base + y_max * 0.20), xytext=(x_centroide_abs, y_base - y_max * 0.14),
@@ -740,7 +744,6 @@ def dibujar_diagrama_fuerzas(puntos_x, puntos_y, h_up, h_down, x_centroide_abs, 
         ax.text(x_centroide_abs, y_base - y_max * 0.18, f"Fs = {U_total:,.0f} kgf",
                 color="#993C1D", fontsize=10.5, fontweight="bold", ha="center", va="top")
 
-    # Peso propio W_T
     ax.annotate("", xy=(x_centroide_abs, y_max * 0.32), xytext=(x_centroide_abs, y_max * 0.62),
                  arrowprops=dict(arrowstyle="-|>", color="#1f1f1f", lw=2.6), zorder=5)
     ax.text(x_centroide_abs, y_max * 0.65, f"W_T = {W_T:,.0f} kgf",
@@ -749,7 +752,8 @@ def dibujar_diagrama_fuerzas(puntos_x, puntos_y, h_up, h_down, x_centroide_abs, 
     ax.set_title("Diagrama de Fuerzas Actuantes — Presa Llena", fontsize=14, fontweight="bold", color=NAVY)
     margen = ancho * 0.38
     ax.set_xlim(x_min - margen, x_max + margen)
-    ax.set_ylim(y_base - y_max * 0.32, y_max + 2)
+    y_hi_total = max(y_max * 1.35, y_max + y_max * 0.35)
+    ax.set_ylim(y_base - y_max * 0.32, y_hi_total + 2)
     ax.set_aspect('equal')
     ax.axis("off")
     fig.patch.set_facecolor("white")
@@ -758,8 +762,7 @@ def dibujar_diagrama_fuerzas(puntos_x, puntos_y, h_up, h_down, x_centroide_abs, 
 
 
 # =========================================================================
-# TABLA DE SOLO LECTURA EN HTML (evita el canvas de st.dataframe, que a
-# veces ignora el tema y deja el texto invisible sobre fondo claro)
+# TABLA DE SOLO LECTURA EN HTML
 # =========================================================================
 def tabla_html(df):
     filas_html = ""
@@ -869,11 +872,6 @@ if modo_entrada == "Por Ángulos y Tramos":
 
 # =========================================================================
 # MODO 2: COORDENADAS MANUALES
-# (usa number_input individuales en vez de st.data_editor: el data_editor
-#  se dibuja en un canvas interno que en ciertos entornos/temas ignora el
-#  CSS y queda con el texto invisible. Con number_input, cada celda es un
-#  input de HTML normal — el mismo tipo de campo que ya se ve bien en
-#  "Altura Tramo" / "Ángulo Tramo" — así que se garantiza que se vea.)
 # =========================================================================
 else:
     st.sidebar.subheader("📊 Tabla de Coordenadas")
@@ -990,7 +988,6 @@ with tab1:
         puntos_x_der_interp = np.array(puntos_x_der)[idx_der_ordenado]
         puntos_y_der_interp = np.array(puntos_y_der)[idx_der_ordenado]
 
-        # Agua aguas arriba
         if h_up > 0 and len(puntos_x_izq_interp) > 0:
             x_linea_up = float(np.interp(h_up, puntos_y_izq_interp, puntos_x_izq_interp))
             x_talud_up = [x for x, y in zip(puntos_x_izq, puntos_y_izq) if y <= h_up]
@@ -1006,7 +1003,6 @@ with tab1:
                 mode="lines", name="Agua aguas arriba", hoverinfo="skip",
             ))
 
-        # Agua aguas abajo
         if h_down > 0 and len(puntos_x_der_interp) > 0:
             x_linea_down = float(np.interp(h_down, puntos_y_der_interp, puntos_x_der_interp))
             x_talud_down = [x for x, y in zip(puntos_x_der, puntos_y_der) if y <= h_down]
@@ -1022,7 +1018,6 @@ with tab1:
                 mode="lines", name="Agua aguas abajo", hoverinfo="skip",
             ))
 
-    # Cuerpo de la presa — tono claro que combina con la paleta (crema/gris muy claro)
     if len(puntos_x) >= 3:
         fig_plotly.add_trace(go.Scatter(
             x=puntos_x + [puntos_x[0]], y=puntos_y + [puntos_y[0]],
@@ -1063,6 +1058,7 @@ with tab2:
     else:
         df_visual = pd.DataFrame({"X (m)": puntos_x, "Y (m)": puntos_y})
         tabla_html(df_visual)
+
 
 # =========================================================================
 # CÁLCULOS DE ESTABILIDAD
@@ -1122,12 +1118,20 @@ with tab4:
     if error_calculo:
         st.error(f"No se pudo calcular: {error_calculo}")
     else:
-        st.markdown("**Fuerzas hidrostáticas y subpresión**")
+        st.markdown("**Empuje hidrostático — componente HORIZONTAL**")
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown(f"<div class='lg-card'><h4>F↑ Horizontal aguas arriba</h4><div class='lg-val'>{res_llena['F_up']:,.0f} kgf</div></div>", unsafe_allow_html=True)
+        with c2:
+            st.markdown(f"<div class='lg-card'><h4>F↓ Horizontal aguas abajo</h4><div class='lg-val'>{res_llena['F_down']:,.0f} kgf</div></div>", unsafe_allow_html=True)
+
+        st.markdown("**Empuje hidrostático — componente VERTICAL** &nbsp;·&nbsp; "
+                     "*(peso del agua apoyada sobre el talud; es 0 si la cara es vertical)*")
         c1, c2, c3 = st.columns(3)
         with c1:
-            st.markdown(f"<div class='lg-card'><h4>Empuje aguas arriba F↑</h4><div class='lg-val'>{res_llena['F_up']:,.0f} kgf</div></div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='lg-card'><h4>Fv↑ Vertical aguas arriba</h4><div class='lg-val'>{res_llena['Fv_up']:,.0f} kgf</div></div>", unsafe_allow_html=True)
         with c2:
-            st.markdown(f"<div class='lg-card'><h4>Empuje aguas abajo F↓</h4><div class='lg-val'>{res_llena['F_down']:,.0f} kgf</div></div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='lg-card'><h4>Fv↓ Vertical aguas abajo</h4><div class='lg-val'>{res_llena['Fv_down']:,.0f} kgf</div></div>", unsafe_allow_html=True)
         with c3:
             st.markdown(f"<div class='lg-card'><h4>Subpresión U</h4><div class='lg-val'>{res_llena['U']:,.0f} kgf</div></div>", unsafe_allow_html=True)
 
@@ -1139,6 +1143,9 @@ with tab4:
             st.markdown(f"<div class='lg-card'><h4>ΣM de volteo</h4><div class='lg-val'>{res_llena['Sum_M_Volteo']:,.0f} kgf·m</div></div>", unsafe_allow_html=True)
         with c3:
             st.markdown(f"<div class='lg-card'><h4>Resultante vertical Rv</h4><div class='lg-val'>{res_llena['R_v']:,.0f} kgf</div></div>", unsafe_allow_html=True)
+        st.caption("Rv = Peso propio (Wт) + Fv↑ + Fv↓ − Subpresión (U). "
+                   "ΣM estabilizadores incluye el peso propio, los momentos de Fv↑ y Fv↓, "
+                   "y el empuje horizontal aguas abajo (si existe).")
 
         st.markdown("**Factores de seguridad**")
         c1, c2 = st.columns(2)
@@ -1173,9 +1180,13 @@ with tab4:
 
         if mostrar_fuerzas:
             x_centroide_abs = res_vacia['x_max'] - res_vacia['x_cg_punta']
-            fig_f = dibujar_diagrama_fuerzas(puntos_x_calc, puntos_y_calc, h_up, h_down,
-                                              x_centroide_abs, res_vacia['W_T'],
-                                              res_llena['F_up'], res_llena['F_down'], res_llena['U'])
+            fig_f = dibujar_diagrama_fuerzas(
+                puntos_x_calc, puntos_y_calc, h_up, h_down,
+                x_centroide_abs, res_vacia['W_T'],
+                res_llena['F_up'], res_llena['F_down'], res_llena['U'],
+                Fv_up=res_llena['Fv_up'], Fv_down=res_llena['Fv_down'],
+                cx_Fv_up=res_llena['cx_Fv_up'], cx_Fv_down=res_llena['cx_Fv_down'],
+            )
             st.pyplot(fig_f)
             
 
