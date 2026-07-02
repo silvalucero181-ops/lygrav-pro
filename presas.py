@@ -1,4 +1,5 @@
 
+
 import streamlit as st
 import matplotlib.pyplot as plt
 import numpy as np
@@ -333,16 +334,27 @@ def _shoelace(px, py):
 def _obtener_cadenas(px, py):
     """
     Divide el contorno de la presa en la cadena aguas arriba (talón→cresta)
-    y aguas abajo (cresta→punta), asumiendo un único vértice de cresta (el
-    de mayor Y). Es la misma lógica que usan la vista "Perfil Geométrico"
-    y la descomposición en rectángulos/triángulos.
+    y aguas abajo (cresta→punta).
+
+    FIX: la versión original asumía un único vértice de cresta
+    (idx_cresta = py.index(max(py))), lo cual falla en cualquier presa con
+    corona plana (el caso normal: 2+ vértices comparten la cota máxima).
+    En ese caso la cadena "aguas abajo" terminaba incluyendo el vértice de
+    cresta AGUAS ARRIBA, contaminando la cuña de agua (Fv_up/Fv_down) y la
+    tabla de descomposición en figuras. Ahora se toma el vértice de cresta
+    más a la IZQUIERDA para cerrar la cadena aguas arriba, y el más a la
+    DERECHA para abrir la cadena aguas abajo, dejando el tramo de corona
+    plana fuera de ambas cuñas de agua (como debe ser: una superficie
+    horizontal en la cresta, por encima del nivel de agua, no genera cuña).
     """
-    idx_cresta = py.index(max(py))
-    chain_izq_x = px[:idx_cresta + 1]
-    chain_izq_y = py[:idx_cresta + 1]
-    chain_der_x = px[idx_cresta:]
-    chain_der_y = py[idx_cresta:]
-    return chain_izq_x, chain_izq_y, chain_der_x, chain_der_y, px[idx_cresta]
+    y_max = max(py)
+    idx_izq = next(i for i, y in enumerate(py) if abs(y - y_max) < 1e-9)
+    idx_der = len(py) - 1 - next(i for i, y in enumerate(reversed(py)) if abs(y - y_max) < 1e-9)
+    chain_izq_x = px[:idx_izq + 1]
+    chain_izq_y = py[:idx_izq + 1]
+    chain_der_x = px[idx_der:]
+    chain_der_y = py[idx_der:]
+    return chain_izq_x, chain_izq_y, chain_der_x, chain_der_y, px[idx_izq]
 
 
 def _decomponer_rectangulos_triangulos(px, py, gamma_c, L):
@@ -582,8 +594,17 @@ def calcular_presa_llena(res_v, h_up, h_down, gamma_w=1000.0, mu=0.75, L=1.0):
     F_H_n  = F_up - F_down
     Fsd    = (mu * R_v) / F_H_n if F_H_n > 0 else float('inf')
 
-    # x'' usa solo fuerzas VERTICALES (peso + Fv_up + Fv_down - subpresión)
-    x_segundo = (M_R + M_Fv_up + M_Fv_down - M_v_sub) / R_v if R_v != 0 else 0.0
+    # FIX: x'' (posición de la resultante) debe surgir del MISMO balance de
+    # momentos totales que se usa para Fsv -- es decir, incluyendo también
+    # los momentos generados por los empujes HORIZONTALES (M_v_up, volcador,
+    # y M_e_down, estabilizador). La fórmula original solo sumaba los
+    # momentos de las fuerzas VERTICALES (M_R, M_Fv_up, M_Fv_down, M_v_sub),
+    # omitiendo M_v_up y M_e_down. Como Fsv sí los incluye, esto generaba una
+    # inconsistencia interna: la excentricidad y los esfuerzos en la base
+    # (sigma_talón/sigma_punta) quedaban calculados con un momento neto
+    # distinto (y mucho menor) que el que realmente definía el equilibrio,
+    # sesgando fuertemente el diagrama de esfuerzos de la presa llena.
+    x_segundo = (Sum_M_Estabilizadores - Sum_M_Volteo) / R_v if R_v != 0 else 0.0
 
     e_llena   = x_segundo - (b_base / 2.0)
     M_e_llena = R_v * e_llena
@@ -1188,5 +1209,4 @@ with tab4:
                 cx_Fv_up=res_llena['cx_Fv_up'], cx_Fv_down=res_llena['cx_Fv_down'],
             )
             st.pyplot(fig_f)
-            
 
