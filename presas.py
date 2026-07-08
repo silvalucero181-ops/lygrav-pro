@@ -1170,13 +1170,13 @@ with tab4:
 
         st.markdown("**Factores de seguridad**")
         c1, c2 = st.columns(2)
-        cls_v = "lg-ok" if res_llena['Fsv'] >= 1.5 else "lg-bad"
-        cls_d = "lg-ok" if res_llena['Fsd'] >= 1.5 else "lg-bad"
+        cls_v = "lg-ok" if res_llena['Fsv'] > 8 else "lg-bad"
+        cls_d = "lg-ok" if res_llena['Fsd'] > 1 else "lg-bad"
         with c1:
-            estado_v = "✓ Estable" if res_llena['Fsv'] >= 1.5 else "✗ Revisar"
+            estado_v = "✓ Estable" if res_llena['Fsv'] > 8 else "✗ Revisar"
             st.markdown(f"<div class='lg-card {cls_v}'><h4>Fsv (volteo) — {estado_v}</h4><div class='lg-val'>{res_llena['Fsv']:.2f}</div></div>", unsafe_allow_html=True)
         with c2:
-            estado_d = "✓ Estable" if res_llena['Fsd'] >= 1.5 else "✗ Revisar"
+            estado_d = "✓ Estable" if res_llena['Fsd'] > 1 else "✗ Revisar"
             st.markdown(f"<div class='lg-card {cls_d}'><h4>Fsd (deslizamiento) — {estado_d}</h4><div class='lg-val'>{res_llena['Fsd']:.2f}</div></div>", unsafe_allow_html=True)
 
         st.markdown("**Posición de la resultante y esfuerzos finales**")
